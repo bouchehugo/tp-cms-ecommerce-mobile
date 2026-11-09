@@ -1,0 +1,90 @@
+<mxfile host="app.diagrams.net">
+  <diagram id="archi-b32" name="Architecture CMS - e-commerce - mobile">
+    <mxGraphModel dx="1400" dy="950" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1360" pageHeight="960" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <!-- Titre -->
+        <mxCell id="titre" value="Parcours complet : CMS → API → e-commerce → app mobile" style="text;html=1;fontSize=24;fontStyle=1;align=left;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="40" y="15" width="1280" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="soustitre" value="TP B3.2 — un contenu créé une seule fois dans le CMS, exposé par des API REST, consommé par une app mobile, avec un paiement délégué" style="text;html=1;fontSize=13;fontColor=#555555;align=left;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="40" y="52" width="1280" height="26" as="geometry" />
+        </mxCell>
+
+        <!-- Acteurs -->
+        <mxCell id="admin" value="Rédacteur / Admin" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;fontSize=12;fontStyle=1;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="30" y="170" width="40" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="client" value="Client&lt;br&gt;(smartphone)" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;fontSize=12;fontStyle=1;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="1235" y="320" width="40" height="70" as="geometry" />
+        </mxCell>
+
+        <!-- Briques -->
+        <mxCell id="strapi" value="&lt;b style=&quot;font-size:16px&quot;&gt;CMS headless — Strapi&lt;/b&gt;&lt;br&gt;&lt;i&gt;EXO 1 · localhost:1337&lt;/i&gt;&lt;hr&gt;&lt;div style=&quot;text-align:left&quot;&gt;• Gère le &lt;b&gt;contenu&lt;/b&gt; : articles (titre + image)&lt;br&gt;• Stocke les données (SQLite) et les médias&lt;br&gt;• Expose le contenu via une &lt;b&gt;API REST JSON&lt;/b&gt;&lt;br&gt;• Aucun affichage : réutilisable sur tous les canaux&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;strokeWidth=2;fontSize=12;arcSize=6;spacing=10;verticalAlign=top;" vertex="1" parent="1">
+          <mxGeometry x="150" y="105" width="330" height="200" as="geometry" />
+        </mxCell>
+        <mxCell id="laravel" value="&lt;b style=&quot;font-size:16px&quot;&gt;API e-commerce — Laravel&lt;/b&gt;&lt;br&gt;&lt;i&gt;EXO 2 · localhost:8000&lt;/i&gt;&lt;hr&gt;&lt;div style=&quot;text-align:left&quot;&gt;• &lt;b&gt;Panier&lt;/b&gt; : POST /api/panier/ajouter&lt;br&gt;• &lt;b&gt;Commande&lt;/b&gt; : POST /api/commande/payer&lt;br&gt;• Renvoie l'URL de paiement du prestataire&lt;br&gt;• &lt;font color=&quot;#b85450&quot;&gt;&lt;b&gt;Refuse toute donnée de carte (erreur 422)&lt;/b&gt;&lt;/font&gt;&lt;br&gt;• Suivi de la commande après paiement&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;strokeWidth=2;fontSize=12;arcSize=6;spacing=10;verticalAlign=top;" vertex="1" parent="1">
+          <mxGeometry x="150" y="440" width="330" height="215" as="geometry" />
+        </mxCell>
+        <mxCell id="flutter" value="&lt;b style=&quot;font-size:16px&quot;&gt;App mobile — Flutter&lt;/b&gt;&lt;br&gt;&lt;i&gt;EXO 3 · Android (cross-platform)&lt;/i&gt;&lt;hr&gt;&lt;div style=&quot;text-align:left&quot;&gt;• &lt;b&gt;Interface&lt;/b&gt; utilisée par le client&lt;br&gt;• Affiche le catalogue (ListView des articles)&lt;br&gt;• Ajoute au panier et lance le paiement&lt;br&gt;• Ne stocke rien : consomme les API&lt;br&gt;• Hot reload pendant le développement&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;strokeWidth=2;fontSize=12;arcSize=6;spacing=10;verticalAlign=top;" vertex="1" parent="1">
+          <mxGeometry x="790" y="245" width="330" height="215" as="geometry" />
+        </mxCell>
+        <mxCell id="paiement" value="&lt;b style=&quot;font-size:16px&quot;&gt;Prestataire de paiement&lt;/b&gt;&lt;br&gt;&lt;i&gt;Stripe, PayPal… (externe et sécurisé)&lt;/i&gt;&lt;hr&gt;&lt;div style=&quot;text-align:left&quot;&gt;• Saisie et vérification de la &lt;b&gt;carte bancaire&lt;/b&gt;&lt;br&gt;• Certifié &lt;b&gt;PCI DSS&lt;/b&gt;&lt;br&gt;• Confirme le paiement au back-end&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;strokeWidth=2;fontSize=12;arcSize=6;spacing=10;verticalAlign=top;" vertex="1" parent="1">
+          <mxGeometry x="790" y="570" width="330" height="160" as="geometry" />
+        </mxCell>
+
+        <!-- Flux -->
+        <mxCell id="e1" value="① publie" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;endFill=1;strokeWidth=2;fontSize=12;labelBackgroundColor=#ffffff;strokeColor=#6c8ebf;exitX=1;exitY=0.5;exitDx=0;exitDy=0;exitPerimeter=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="admin" target="strapi">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e2" value="&lt;b&gt;② GET /api/articles?populate=image&lt;/b&gt;&lt;br&gt;← réponse JSON (titres + images)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;endFill=1;startArrow=none;strokeWidth=2;fontSize=12;labelBackgroundColor=#ffffff;strokeColor=#6c8ebf;exitX=0;exitY=0.2;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="flutter" target="strapi">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e3" value="&lt;b&gt;③ POST /api/panier/ajouter&lt;/b&gt; → 201 Created&lt;br&gt;&lt;b&gt;④ POST /api/commande/payer&lt;/b&gt; → url_paiement" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;endFill=1;strokeWidth=2;fontSize=12;labelBackgroundColor=#ffffff;strokeColor=#82b366;exitX=0;exitY=0.8;exitDx=0;exitDy=0;entryX=1;entryY=0.25;entryDx=0;entryDy=0;" edge="1" parent="1" source="flutter" target="laravel">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e5" value="⑤ redirection vers&lt;br&gt;la page de paiement" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;endFill=1;strokeWidth=2;fontSize=12;labelBackgroundColor=#ffffff;strokeColor=#d79b00;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="flutter" target="paiement">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e6" value="⑥ confirmation du paiement (webhook)&lt;br&gt;→ commande validée&lt;br&gt;&lt;i&gt;&lt;font color=&quot;#777777&quot;&gt;simulé dans le TP&lt;/font&gt;&lt;/i&gt;" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;endFill=1;strokeWidth=2;dashed=1;fontSize=12;labelBackgroundColor=#ffffff;strokeColor=#b85450;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.8;entryDx=0;entryDy=0;" edge="1" parent="1" source="paiement" target="laravel">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e7" value="utilise l'app" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;endFill=1;strokeWidth=2;fontSize=12;labelBackgroundColor=#ffffff;exitX=0;exitY=0.333;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;exitPerimeter=0;" edge="1" parent="1" source="client" target="flutter">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e8" value="&lt;b&gt;&lt;font color=&quot;#b85450&quot;&gt;saisit sa carte ici uniquement&lt;/font&gt;&lt;/b&gt;" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;endFill=1;strokeWidth=2;fontSize=12;labelBackgroundColor=#ffffff;strokeColor=#b85450;exitX=1;exitY=0.5;exitDx=0;exitDy=0;exitPerimeter=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="client" target="paiement">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1310" y="355" />
+              <mxPoint x="1310" y="650" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+        <!-- Règle de sécurité -->
+        <mxCell id="regle" value="&lt;b&gt;Règle de sécurité&lt;/b&gt; : aucune donnée de carte bancaire ne transite par notre code. Laravel ne reçoit que l'id de commande et le montant." style="shape=note;whiteSpace=wrap;html=1;size=14;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=12;align=left;spacing=8;" vertex="1" parent="1">
+          <mxGeometry x="150" y="672" width="330" height="72" as="geometry" />
+        </mxCell>
+
+        <!-- Tunnel d'achat -->
+        <mxCell id="tunnelTitre" value="Tunnel d'achat — quelle brique gère quelle étape" style="text;html=1;fontSize=15;fontStyle=1;align=left;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="150" y="775" width="600" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="t1" value="&lt;b&gt;Catalogue&lt;/b&gt;&lt;br&gt;Strapi + Flutter" style="shape=step;perimeter=stepPerimeter;whiteSpace=wrap;html=1;fixedSize=1;size=22;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=13;" vertex="1" parent="1">
+          <mxGeometry x="150" y="815" width="250" height="65" as="geometry" />
+        </mxCell>
+        <mxCell id="t2" value="&lt;b&gt;Panier&lt;/b&gt;&lt;br&gt;Laravel" style="shape=step;perimeter=stepPerimeter;whiteSpace=wrap;html=1;fixedSize=1;size=22;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=13;" vertex="1" parent="1">
+          <mxGeometry x="395" y="815" width="250" height="65" as="geometry" />
+        </mxCell>
+        <mxCell id="t3" value="&lt;b&gt;Paiement&lt;/b&gt;&lt;br&gt;Prestataire externe" style="shape=step;perimeter=stepPerimeter;whiteSpace=wrap;html=1;fixedSize=1;size=22;fillColor=#f8cecc;strokeColor=#b85450;fontSize=13;" vertex="1" parent="1">
+          <mxGeometry x="640" y="815" width="250" height="65" as="geometry" />
+        </mxCell>
+        <mxCell id="t4" value="&lt;b&gt;Commande&lt;/b&gt;&lt;br&gt;Laravel (suivi)" style="shape=step;perimeter=stepPerimeter;whiteSpace=wrap;html=1;fixedSize=1;size=22;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=13;" vertex="1" parent="1">
+          <mxGeometry x="885" y="815" width="250" height="65" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
