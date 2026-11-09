@@ -1,0 +1,14 @@
+# Supports de cours (droits de l'enseignant)
+/*.pdf
+
+# Notes locales
+/PROCEDURE_DEMO_TP.txt
+
+# Fichiers secrets
+.env
+
+# Systeme / editeurs
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
