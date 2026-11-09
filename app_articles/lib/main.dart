@@ -49,7 +49,7 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'Articles CMS',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(colorSchemeSeed: Colors.orange),
+      theme: ThemeData(colorSchemeSeed: Colors.purple),
       home: const ArticlesPage(),
     );
   }
