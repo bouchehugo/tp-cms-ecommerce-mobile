@@ -103,7 +103,7 @@ class StripeCheckoutTest extends TestCase
 
     public function test_missing_or_live_secret_rejected_and_tampered_total_rejected(): void
     {
-        foreach (['', 'sk_live_fake_not_a_real_key'] as $secret) {
+        foreach (['', 'sk_live_fake_not_a_real_key', 'rk_live_fake_not_a_real_key', 'pk_test_fake_not_a_secret'] as $secret) {
             config(['services.stripe.secret' => $secret]);
             $this->postJson('/api/commande/stripe/checkout', $this->panier())->assertStatus(503);
         }
@@ -119,6 +119,18 @@ class StripeCheckoutTest extends TestCase
         $data['card_number'] = '4242424242424242';
         $this->postJson('/api/commande/stripe/checkout', $data)->assertUnprocessable();
         $this->assertDatabaseCount('commandes', 0);
+    }
+
+    public function test_restricted_test_key_supports_checkout_and_verification(): void
+    {
+        config(['services.stripe.secret' => 'rk_test_fake_for_unit_tests']);
+        $this->postJson('/api/commande/stripe/checkout', $this->panier())->assertOk();
+        $this->paid = true;
+        $this->getJson('/api/commande/stripe/cs_test_session')
+            ->assertOk()->assertJsonPath('statut', 'paye_test');
+        Http::assertSent(fn ($r) => $r->url() === 'https://api.stripe.com/v1/checkout/sessions'
+            && $r->hasHeader('Authorization', 'Bearer rk_test_fake_for_unit_tests'));
+        $this->assertDatabaseCount('commandes', 1);
     }
 
     public function test_network_retry_does_not_duplicate_order(): void

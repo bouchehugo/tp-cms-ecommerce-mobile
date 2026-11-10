@@ -60,10 +60,14 @@ STRIPE_WEBHOOK_SECRET=
 STRIPE_RETURN_URL=http://127.0.0.1:8080
 ```
 
-Mettre la clé secrète de **test** du compte Stripe (`sk_test_…`) dans
+Mettre une clé serveur de **test** du compte Stripe (`sk_test_…` ou `rk_test_…`) dans
 `STRIPE_SECRET`. Ne jamais la mettre dans Flutter, le chat ou Git.
 Aucune clé publique n'est nécessaire pour cette redirection vers Checkout.
 Le serveur refuse les clés de production et les sessions en mode réel.
+Pour une clé restreinte `rk_test_…`, commencer par **Checkout Sessions : Écrire**
+(inclut la lecture), en laissant les autres ressources sur Aucun. Si Stripe
+signale une permission supplémentaire requise, consulter les journaux de cette
+clé et ajouter uniquement la permission indiquée, puis refaire l'essai.
 
 ```powershell
 cd boutique-api

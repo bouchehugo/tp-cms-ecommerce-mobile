@@ -16,8 +16,8 @@ class StripeCommandeController extends CommandeController
     private function client()
     {
         $secret = (string) config('services.stripe.secret');
-        abort_unless(str_starts_with($secret, 'sk_test_'), 503,
-            'Stripe n’est pas configuré. Ajoutez une clé sk_test_ dans boutique-api/.env.');
+        abort_unless(str_starts_with($secret, 'sk_test_') || str_starts_with($secret, 'rk_test_'), 503,
+            'Stripe n’est pas configuré. Ajoutez une clé sk_test_ ou rk_test_ dans boutique-api/.env.');
         return Http::withToken($secret)->acceptJson()->timeout(25)
             ->withHeaders(['Stripe-Version' => '2026-10-28.endive']);
     }
@@ -69,6 +69,8 @@ class StripeCommandeController extends CommandeController
             } catch (ConnectionException $exception) {
                 abort(503, 'Stripe est temporairement inaccessible. Réessayez la même tentative.');
             }
+            abort_if($response->status() === 403, 502,
+                'La clé Stripe manque d’autorisations. Vérifiez les permissions Checkout Sessions et les journaux de requêtes dans Stripe.');
             abort_unless($response->successful(), 502,
                 'Impossible de créer la session Stripe. Vérifiez la clé de test et réessayez.');
             $session = $response->json();
