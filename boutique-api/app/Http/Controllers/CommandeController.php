@@ -16,14 +16,43 @@ class CommandeController extends Controller
     {
         // Ce simulateur ne dispose d'aucun accès à un prestataire bancaire.
         abort_unless(config('services.paiement_demo'), 403, 'Le paiement de démonstration est désactivé.');
+        $data = $this->donnees($request);
+        $empreinte = hash('sha256', json_encode(Arr::except($data, 'cle_idempotence')));
+        $existante = DB::table('commandes_demo')->where('cle_idempotence', $data['cle_idempotence'])->first();
+        if ($existante) {
+            abort_unless(hash_equals($existante->empreinte, $empreinte), 409, 'Cette tentative correspond à un autre panier.');
+            return $this->resultat($existante);
+        }
+
+        [$lignes, $total] = $this->catalogue($data);
+
+        // Une relance réseau du même paiement ne crée pas une deuxième commande.
+        DB::table('commandes_demo')->insertOrIgnore([
+            'reference' => (string) Str::uuid(),
+            'cle_idempotence' => $data['cle_idempotence'],
+            'empreinte' => $empreinte,
+            'statut' => $data['scenario'] === 'accepte' ? 'paye_demo' : 'refuse_demo',
+            'total_centimes' => $total,
+            'lignes' => json_encode($lignes),
+            'livraison' => json_encode($data['livraison']),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $commande = DB::table('commandes_demo')->where('cle_idempotence', $data['cle_idempotence'])->first();
+        abort_unless(hash_equals($commande->empreinte, $empreinte), 409, 'Cette tentative correspond à un autre panier.');
+        return $this->resultat($commande);
+    }
+
+    protected function donnees(Request $request, bool $simulation = true): array
+    {
         foreach (array_keys(Arr::dot($request->all())) as $champ) {
             if (preg_match('/(^|\.)(card_number|numero_carte|cvv|cvc|expiration|date_expiration)$/i', $champ)) {
                 throw ValidationException::withMessages(['paiement' => 'Aucune donnée de carte bancaire ne doit être envoyée.']);
             }
         }
-        $data = $request->validate([
+        return $request->validate([
             'cle_idempotence' => 'required|uuid',
-            'scenario' => 'required|in:accepte,refuse',
+            'scenario' => $simulation ? 'required|in:accepte,refuse' : 'prohibited',
             'total_attendu_centimes' => 'required|integer|min:1',
             'lignes' => 'required|array|min:1|max:50',
             'lignes.*.document_id' => 'required|string|max:100|distinct',
@@ -38,13 +67,10 @@ class CommandeController extends Controller
             'livraison.telephone' => 'required|string|max:30',
             'livraison.email' => 'required|email|max:255',
         ]);
-        $empreinte = hash('sha256', json_encode(Arr::except($data, 'cle_idempotence')));
-        $existante = DB::table('commandes_demo')->where('cle_idempotence', $data['cle_idempotence'])->first();
-        if ($existante) {
-            abort_unless(hash_equals($existante->empreinte, $empreinte), 409, 'Cette tentative correspond à un autre panier.');
-            return $this->resultat($existante);
-        }
+    }
 
+    protected function catalogue(array $data): array
+    {
         $lignes = [];
         $total = 0;
         foreach ($data['lignes'] as $ligne) {
@@ -80,21 +106,7 @@ class CommandeController extends Controller
         abort_if($total !== $data['total_attendu_centimes'], 409,
             'Le prix du panier a changé. Revenez aux articles et recréez votre panier.');
 
-        // Une relance réseau du même paiement ne crée pas une deuxième commande.
-        DB::table('commandes_demo')->insertOrIgnore([
-            'reference' => (string) Str::uuid(),
-            'cle_idempotence' => $data['cle_idempotence'],
-            'empreinte' => $empreinte,
-            'statut' => $data['scenario'] === 'accepte' ? 'paye_demo' : 'refuse_demo',
-            'total_centimes' => $total,
-            'lignes' => json_encode($lignes),
-            'livraison' => json_encode($data['livraison']),
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
-        $commande = DB::table('commandes_demo')->where('cle_idempotence', $data['cle_idempotence'])->first();
-        abort_unless(hash_equals($commande->empreinte, $empreinte), 409, 'Cette tentative correspond à un autre panier.');
-        return $this->resultat($commande);
+        return [$lignes, $total];
     }
 
     private function resultat(object $commande)

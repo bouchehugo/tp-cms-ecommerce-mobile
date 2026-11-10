@@ -76,29 +76,90 @@ void main() {
     expect(find.text('Votre panier est vide'), findsOneWidget);
   });
 
-  testWidgets('Refus puis acceptation du paiement, sans carte transmise', (
+  testWidgets(
+    'Checkout préparé ne signifie pas payé, confirmation serveur requise',
+    (tester) async {
+      final ancienClient = apiClient;
+      addTearDown(() => apiClient = ancienClient);
+      final requetes = <Map<String, dynamic>>[];
+      var paid = false;
+      apiClient = MockClient((request) async {
+        if (request.method == 'POST') {
+          final data = jsonDecode(request.body) as Map<String, dynamic>;
+          requetes.add(data);
+          return http.Response(
+            jsonEncode({
+              'mode': 'stripe_test',
+              'session_id': 'cs_test_example',
+              'checkout_url':
+                  'https://checkout.stripe.com/c/pay/cs_test_example',
+              'total_centimes': 1990,
+            }),
+            200,
+          );
+        }
+        return http.Response(
+          jsonEncode({
+            'mode': 'stripe_test',
+            'reference': 'STRIPE-TEST',
+            'statut': paid ? 'paye_test' : 'en_attente',
+            'total_centimes': 1990,
+            'lignes': [
+              {
+                'titre': 'Article A',
+                'quantite': 1,
+                'sous_total_centimes': 1990,
+              },
+            ],
+          }),
+          200,
+        );
+      });
+      var paye = false;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: PaiementPage(
+            lignes: [LignePanier(article)],
+            livraison: livraison,
+            onPaye: () => paye = true,
+          ),
+        ),
+      );
+      expect(find.text('Accepté'), findsNothing);
+      expect(find.text('Refusé'), findsNothing);
+      await tester.tap(find.text('Préparer le paiement Stripe'));
+      await tester.pumpAndSettle();
+      expect(find.text('Ouvrir Stripe Checkout'), findsOneWidget);
+      expect(paye, isFalse);
+      await tester.tap(find.text('J’ai terminé le paiement · Vérifier'));
+      await tester.pumpAndSettle();
+      expect(paye, isFalse);
+      expect(find.textContaining('pas encore confirmé'), findsOneWidget);
+      paid = true;
+      await tester.tap(find.text('J’ai terminé le paiement · Vérifier'));
+      await tester.pumpAndSettle();
+      expect(paye, isTrue);
+      expect(find.text('Paiement Stripe confirmé'), findsOneWidget);
+      expect(requetes.single['lignes'], [
+        {'document_id': 'article-a', 'quantite': 1},
+      ]);
+      expect(requetes.single.containsKey('scenario'), isFalse);
+      expect(requetes.single.containsKey('card_number'), isFalse);
+    },
+  );
+
+  testWidgets('Clé manquante : erreur affichée, panier conservé', (
     tester,
   ) async {
     final ancienClient = apiClient;
     addTearDown(() => apiClient = ancienClient);
-    final requetes = <Map<String, dynamic>>[];
-    apiClient = MockClient((request) async {
-      final data = jsonDecode(request.body) as Map<String, dynamic>;
-      requetes.add(data);
-      return http.Response(
-        jsonEncode({
-          'mode': 'simulation_locale',
-          'reference': 'DEMO-TEST',
-          'statut': data['scenario'] == 'refuse' ? 'refuse_demo' : 'paye_demo',
-          'message': 'Carte fictive refusée. Réessayez.',
-          'total_centimes': 1990,
-          'lignes': [
-            {'titre': 'Article A', 'quantite': 1, 'sous_total_centimes': 1990},
-          ],
-        }),
-        200,
-      );
-    });
+    apiClient = MockClient(
+      (_) async => http.Response(
+        jsonEncode({'message': 'Stripe n’est pas configuré.'}),
+        503,
+        headers: {'content-type': 'application/json; charset=utf-8'},
+      ),
+    );
     var paye = false;
     await tester.pumpWidget(
       MaterialApp(
@@ -109,26 +170,10 @@ void main() {
         ),
       ),
     );
-    await tester.tap(find.text('Refusé'));
-    await tester.pump();
-    await tester.tap(find.text('Simuler le paiement de 19,90 €'));
+    await tester.tap(find.text('Préparer le paiement Stripe'));
     await tester.pumpAndSettle();
+    expect(find.text('Stripe n’est pas configuré.'), findsOneWidget);
     expect(paye, isFalse);
-    expect(find.text('Carte fictive refusée. Réessayez.'), findsOneWidget);
-    await tester.tap(find.text('Accepté'));
-    await tester.pump();
-    await tester.tap(find.text('Simuler le paiement de 19,90 €'));
-    await tester.pumpAndSettle();
-    expect(paye, isTrue);
-    expect(find.text('Paiement de test accepté'), findsOneWidget);
-    expect(find.text('Total simulé : 19,90 €'), findsOneWidget);
-    expect(
-      requetes[0]['cle_idempotence'],
-      isNot(requetes[1]['cle_idempotence']),
-    );
-    expect(requetes[1]['lignes'], [
-      {'document_id': 'article-a', 'quantite': 1},
-    ]);
-    expect(requetes[1].containsKey('card_number'), isFalse);
+    expect(find.text('Préparer le paiement Stripe'), findsOneWidget);
   });
 }

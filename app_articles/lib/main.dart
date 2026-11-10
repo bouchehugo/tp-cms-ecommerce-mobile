@@ -1,9 +1,11 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:url_launcher/url_launcher.dart';
 
 const String baseUrl = String.fromEnvironment(
   'STRAPI_URL',
@@ -123,7 +125,11 @@ class MyApp extends StatelessWidget {
     title: 'Articles CMS',
     debugShowCheckedModeBanner: false,
     theme: ThemeData(colorSchemeSeed: Colors.purple),
-    home: const ArticlesPage(),
+    home: Uri.base.queryParameters['stripe_session'] != null
+        ? RetourStripePage(
+            sessionId: Uri.base.queryParameters['stripe_session']!,
+          )
+        : const ArticlesPage(),
   );
 }
 
@@ -628,10 +634,21 @@ class PaiementPage extends StatefulWidget {
 }
 
 class _PaiementPageState extends State<PaiementPage> {
-  String scenario = 'accepte';
   String cle = nouvelleTentative();
+  String? sessionId;
+  Uri? checkoutUrl;
   bool enCours = false;
+  bool verification = false;
+  bool expire = false;
   String? erreur;
+  String? information;
+  Timer? suivi;
+
+  @override
+  void dispose() {
+    suivi?.cancel();
+    super.dispose();
+  }
 
   Future<void> payer() async {
     if (enCours) return;
@@ -642,14 +659,13 @@ class _PaiementPageState extends State<PaiementPage> {
     try {
       final response = await apiClient
           .post(
-            Uri.parse('$apiBoutiqueUrl/api/commande/payer'),
+            Uri.parse('$apiBoutiqueUrl/api/commande/stripe/checkout'),
             headers: {
               'Content-Type': 'application/json',
               'Accept': 'application/json',
             },
             body: jsonEncode({
               'cle_idempotence': cle,
-              'scenario': scenario,
               'total_attendu_centimes': totalPanier(widget.lignes),
               'lignes': widget.lignes
                   .map(
@@ -663,38 +679,87 @@ class _PaiementPageState extends State<PaiementPage> {
             }),
           )
           .timeout(const Duration(seconds: 45));
-      if (!mounted) return;
       if (response.statusCode != 200) throw Exception(messageApi(response));
       final resultat = jsonDecode(response.body) as Map<String, dynamic>;
-      if (resultat['mode'] != 'simulation_locale') {
-        throw Exception('Réponse de paiement inattendue.');
+      final url = Uri.parse(resultat['checkout_url'] as String);
+      if (resultat['mode'] != 'stripe_test' ||
+          url.scheme != 'https' ||
+          url.host != 'checkout.stripe.com' ||
+          !(resultat['session_id'] as String).startsWith('cs_test_')) {
+        throw Exception('Session Stripe de test invalide.');
       }
-      if (resultat['statut'] == 'refuse_demo') {
-        setState(() {
-          erreur = resultat['message'] as String;
-          cle = nouvelleTentative();
-        });
-        return;
-      }
-      if (resultat['statut'] != 'paye_demo') {
-        throw Exception('Paiement non confirmé.');
-      }
-      widget.onPaye();
       if (!mounted) return;
-      Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (_) => ConfirmationPage(resultat: resultat)),
-        (route) => route.isFirst,
-      );
+      setState(() {
+        sessionId = resultat['session_id'] as String;
+        checkoutUrl = url;
+        expire = false;
+      });
     } catch (e) {
       if (mounted) {
-        setState(
-          () => erreur = e is Exception
-              ? e.toString().replaceFirst('Exception: ', '')
-              : 'Paiement non confirmé. Réessayez avec le même bouton.',
-        );
+        setState(() => erreur = e.toString().replaceFirst('Exception: ', ''));
       }
     } finally {
       if (mounted) setState(() => enCours = false);
+    }
+  }
+
+  Future<void> ouvrirStripe() async {
+    try {
+      // Un second clic ouvre la page : évite le blocage des fenêtres après une requête réseau.
+      final ouvert = await launchUrl(
+        checkoutUrl!,
+        mode: LaunchMode.externalApplication,
+        webOnlyWindowName: '_blank',
+      );
+      if (!ouvert) throw Exception('Le navigateur n’a pas pu ouvrir Stripe.');
+      suivi?.cancel();
+      suivi = Timer.periodic(
+        const Duration(seconds: 4),
+        (_) => verifier(silencieux: true),
+      );
+    } catch (e) {
+      if (mounted) {
+        setState(() => erreur = e.toString().replaceFirst('Exception: ', ''));
+      }
+    }
+  }
+
+  Future<void> verifier({bool silencieux = false}) async {
+    if (verification || sessionId == null || !mounted) return;
+    setState(() {
+      verification = true;
+      if (!silencieux) erreur = null;
+    });
+    try {
+      final resultat = await verifierSessionStripe(sessionId!);
+      if (!mounted) return;
+      if (resultat['statut'] == 'paye_test') {
+        suivi?.cancel();
+        widget.onPaye();
+        if (!mounted) return;
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(
+            builder: (_) => ConfirmationPage(resultat: resultat),
+          ),
+          (route) => route.isFirst,
+        );
+      } else if (resultat['statut'] == 'expire') {
+        suivi?.cancel();
+        setState(() {
+          expire = true;
+          erreur = 'La session a expiré. Créez une nouvelle tentative.';
+        });
+      } else if (!silencieux) {
+        setState(
+          () => information = 'Stripe n’a pas encore confirmé le paiement. Vous pouvez retourner sur Checkout.',
+        );
+      }
+    } catch (e) {
+      if (mounted && !silencieux) {
+        setState(() => erreur = e.toString().replaceFirst('Exception: ', ''));
+      }
+    } finally {
+      if (mounted) setState(() => verification = false);
     }
   }
 
@@ -703,13 +768,12 @@ class _PaiementPageState extends State<PaiementPage> {
     canPop: !enCours,
     child: Scaffold(
       appBar: AppBar(
-        title: const Text('Paiement de test'),
+        title: const Text('Paiement Stripe'),
         backgroundColor: Theme.of(context).colorScheme.primaryContainer,
       ),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          const SizedBox(height: 24),
           Text(
             'À régler : ${euros(totalPanier(widget.lignes))}',
             style: Theme.of(context).textTheme.headlineSmall,
@@ -723,65 +787,150 @@ class _PaiementPageState extends State<PaiementPage> {
           const Card(
             child: ListTile(
               leading: Icon(Icons.credit_card),
-              title: Text('Carte fictive · •••• 4242'),
+              title: Text('Stripe Checkout · Mode test'),
               subtitle: Text(
-                'Simulation locale, sans saisie de carte bancaire',
+                'La carte se saisit uniquement sur la page sécurisée de Stripe.',
               ),
             ),
           ),
-          const SizedBox(height: 16),
-          const Text('Choisissez le résultat à tester :'),
-          const SizedBox(height: 8),
-          SegmentedButton<String>(
-            segments: const [
-              ButtonSegment(
-                value: 'accepte',
-                label: Text('Accepté'),
-                icon: Icon(Icons.check_circle_outline),
-              ),
-              ButtonSegment(
-                value: 'refuse',
-                label: Text('Refusé'),
-                icon: Icon(Icons.cancel_outlined),
-              ),
-            ],
-            selected: {scenario},
-            onSelectionChanged: enCours
-                ? null
-                : (valeurs) => setState(() {
-                    scenario = valeurs.single;
-                    cle = nouvelleTentative();
-                    erreur = null;
-                  }),
+          const SizedBox(height: 12),
+          const SelectableText(
+            'Carte de test : 4242 4242 4242 4242\nExpiration : 12/34 · CVC : 123',
           ),
+          const SizedBox(height: 24),
           if (erreur != null)
             Padding(
-              padding: const EdgeInsets.symmetric(vertical: 16),
+              padding: const EdgeInsets.only(bottom: 16),
               child: Text(
                 erreur!,
                 style: TextStyle(color: Theme.of(context).colorScheme.error),
               ),
             ),
-          const SizedBox(height: 24),
-          FilledButton.icon(
-            onPressed: enCours ? null : payer,
-            icon: enCours
-                ? const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(Icons.science_outlined),
-            label: Text(
-              enCours
-                  ? 'Vérification en cours…'
-                  : 'Simuler le paiement de ${euros(totalPanier(widget.lignes))}',
+          if (information != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 16),
+              child: Text(information!),
             ),
-          ),
-          const SizedBox(height: 16),
+          if (sessionId == null || expire)
+            FilledButton.icon(
+              onPressed: enCours
+                  ? null
+                  : () {
+                      if (expire) {
+                        cle = nouvelleTentative();
+                        sessionId = null;
+                        checkoutUrl = null;
+                      }
+                      payer();
+                    },
+              icon: const Icon(Icons.lock_outline),
+              label: Text(
+                enCours
+                    ? 'Préparation…'
+                    : expire
+                    ? 'Nouvelle tentative'
+                    : 'Préparer le paiement Stripe',
+              ),
+            )
+          else ...[
+            FilledButton.icon(
+              onPressed: ouvrirStripe,
+              icon: const Icon(Icons.open_in_new),
+              label: const Text('Ouvrir Stripe Checkout'),
+            ),
+            const SizedBox(height: 12),
+            OutlinedButton(
+              onPressed: verification ? null : verifier,
+              child: Text(
+                verification
+                    ? 'Vérification…'
+                    : 'J’ai terminé le paiement · Vérifier',
+              ),
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              'Si vous annulez ou si la carte est refusée, votre panier est conservé.',
+            ),
+          ],
         ],
       ),
     ),
+  );
+}
+
+Future<Map<String, dynamic>> verifierSessionStripe(String sessionId) async {
+  final response = await apiClient
+      .get(
+        Uri.parse(
+          '$apiBoutiqueUrl/api/commande/stripe/${Uri.encodeComponent(sessionId)}',
+        ),
+        headers: {'Accept': 'application/json'},
+      )
+      .timeout(const Duration(seconds: 35));
+  if (response.statusCode != 200) throw Exception(messageApi(response));
+  final resultat = jsonDecode(response.body) as Map<String, dynamic>;
+  if (resultat['mode'] != 'stripe_test') {
+    throw Exception('Réponse Stripe inattendue.');
+  }
+  return resultat;
+}
+
+class RetourStripePage extends StatefulWidget {
+  const RetourStripePage({super.key, required this.sessionId});
+  final String sessionId;
+  @override
+  State<RetourStripePage> createState() => _RetourStripePageState();
+}
+
+class _RetourStripePageState extends State<RetourStripePage> {
+  late Future<Map<String, dynamic>> verification = verifierSessionStripe(
+    widget.sessionId,
+  );
+  @override
+  Widget build(BuildContext context) => FutureBuilder<Map<String, dynamic>>(
+    future: verification,
+    builder: (context, snapshot) {
+      if (snapshot.hasData && snapshot.data!['statut'] == 'paye_test') {
+        return ConfirmationPage(resultat: snapshot.data!);
+      }
+      return Scaffold(
+        appBar: AppBar(title: const Text('Vérification Stripe')),
+        body: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (snapshot.connectionState == ConnectionState.waiting)
+                const Center(child: CircularProgressIndicator())
+              else ...[
+                Text(
+                  snapshot.hasError
+                      ? snapshot.error.toString().replaceFirst(
+                          'Exception: ',
+                          '',
+                        )
+                      : 'Paiement pas encore confirmé par Stripe.',
+                ),
+                const SizedBox(height: 16),
+                FilledButton(
+                  onPressed: () => setState(() {
+                    verification = verifierSessionStripe(widget.sessionId);
+                  }),
+                  child: const Text('Vérifier à nouveau'),
+                ),
+              ],
+              const SizedBox(height: 16),
+              TextButton(
+                onPressed: () => Navigator.of(context).pushReplacement(
+                  MaterialPageRoute(builder: (_) => const ArticlesPage()),
+                ),
+                child: const Text('Retour aux articles'),
+              ),
+            ],
+          ),
+        ),
+      );
+    },
   );
 }
 
@@ -790,7 +939,7 @@ class ConfirmationPage extends StatelessWidget {
   final Map<String, dynamic> resultat;
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('Confirmation du test')),
+    appBar: AppBar(title: const Text('Confirmation Stripe')),
     body: ListView(
       padding: const EdgeInsets.all(24),
       children: [
@@ -798,13 +947,13 @@ class ConfirmationPage extends StatelessWidget {
         const Icon(Icons.check_circle_outline, color: Colors.green, size: 72),
         const SizedBox(height: 16),
         Text(
-          'Paiement de test accepté',
+          'Paiement Stripe confirmé',
           textAlign: TextAlign.center,
           style: Theme.of(context).textTheme.headlineSmall,
         ),
         const SizedBox(height: 8),
         const Text(
-          'Aucun débit réel. Votre panier a été vidé.',
+          'Paiement de test confirmé par Stripe.',
           textAlign: TextAlign.center,
         ),
         const SizedBox(height: 24),
@@ -819,13 +968,15 @@ class ConfirmationPage extends StatelessWidget {
           ),
         const SizedBox(height: 16),
         Text(
-          'Total simulé : ${euros(resultat['total_centimes'] as int)}',
+          'Total payé en mode test : ${euros(resultat['total_centimes'] as int)}',
           style: Theme.of(context).textTheme.titleLarge,
         ),
         const SizedBox(height: 24),
         FilledButton(
-          onPressed: () =>
-              Navigator.popUntil(context, (route) => route.isFirst),
+          onPressed: () => Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute(builder: (_) => const ArticlesPage()),
+            (route) => false,
+          ),
           child: const Text('Retour aux articles'),
         ),
       ],

@@ -5,6 +5,11 @@ return [
         'url' => env('STRAPI_URL', 'http://127.0.0.1:1337'),
     ],
     'paiement_demo' => env('PAYMENT_DEMO_ENABLED', false),
+    'stripe' => [
+        'secret' => env('STRIPE_SECRET'),
+        'webhook_secret' => env('STRIPE_WEBHOOK_SECRET'),
+        'return_url' => env('STRIPE_RETURN_URL', 'http://127.0.0.1:8080'),
+    ],
 
     /*
     |--------------------------------------------------------------------------
