@@ -1,6 +1,6 @@
 # TP B3.2 - CMS, e-commerce et mobile
 
-Hugo BOUCHE & Valentin SCHMITT & Ben Toure - M1
+Hugo BOUCHE & Valentin SCHMITT & Ben TOURE - M1
 
 - `cms-headless` : CMS headless Strapi (articles)
 - `boutique-api` : API e-commerce Laravel (panier + paiement)
