@@ -11,6 +11,14 @@
   },
   "pluginOptions": {},
   "attributes": {
+    "prix": {
+      "type": "decimal",
+      "min": 0.01
+    },
+    "stock": {
+      "type": "integer",
+      "min": 0
+    },
     "titre": {
       "type": "string"
     },

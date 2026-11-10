@@ -1,6 +1,10 @@
 <?php
 
 return [
+    'strapi' => [
+        'url' => env('STRAPI_URL', 'http://127.0.0.1:1337'),
+    ],
+    'paiement_demo' => env('PAYMENT_DEMO_ENABLED', false),
 
     /*
     |--------------------------------------------------------------------------
