@@ -49,7 +49,7 @@ class StripeCommandeController extends CommandeController
                 ! parse_url($retour, PHP_URL_QUERY) && ! parse_url($retour, PHP_URL_FRAGMENT),
                 503, 'STRIPE_RETURN_URL doit être une URL sans paramètres ni fragment.');
             $params = [
-                'mode' => 'payment', 'payment_method_types' => ['card'], 'locale' => 'fr',
+                'mode' => 'payment', 'allowed_payment_method_types' => ['card'], 'locale' => 'fr',
                 'success_url' => $retour.'/?stripe_session={CHECKOUT_SESSION_ID}',
                 'cancel_url' => $retour.'/?stripe_cancelled=1',
                 'client_reference_id' => $commande->reference,

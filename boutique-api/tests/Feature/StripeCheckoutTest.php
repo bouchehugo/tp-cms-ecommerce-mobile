@@ -82,6 +82,8 @@ class StripeCheckoutTest extends TestCase
         Http::assertSent(fn ($r) => $r->url() === 'https://api.stripe.com/v1/checkout/sessions'
             && $r['line_items'][0]['price_data']['unit_amount'] === 1990
             && $r['line_items'][0]['quantity'] === 2
+            && $r['allowed_payment_method_types'] === ['card']
+            && ! isset($r['payment_method_types'])
             && $r['success_url'] === 'http://127.0.0.1:8080/?stripe_session={CHECKOUT_SESSION_ID}'
             && $r->hasHeader('Idempotency-Key', 'checkout-'.$data['cle_idempotence'])
             && ! isset($r['livraison']) && ! isset($r['customer_email']));
