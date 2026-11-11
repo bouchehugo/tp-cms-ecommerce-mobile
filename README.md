@@ -20,6 +20,15 @@ npm run develop
 ```
 Admin : http://localhost:1337/admin (admin@demo.local / DemoTP-B32!)
 
+Les articles et les images sont dans `.tmp/data.db` et `public/uploads`.
+Si vous voyez d'autres articles que les nôtres, c'est qu'un autre Strapi tourne
+déjà sur le port 1337 : l'arrêter, puis relancer celui du dépôt.
+Pour revenir à notre base :
+```
+git checkout -- .tmp/data.db public/uploads
+```
+Ne commitez pas `data.db` si vous avez juste testé des choses dans Strapi.
+
 Laravel (port 8000)
 ```
 cd boutique-api
